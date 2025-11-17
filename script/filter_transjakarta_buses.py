@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Filter Transjakarta GTFS so Mikrotrans (JAK.*) data is separated.
+"""Filter Transjakarta GTFS so Mikrotrans (JAK.*) data is isolated under filtered/.
 
-This script now performs three operations:
-1. Split `routes.csv` into bus (`routes_bus_only.csv`) and mikrotrans (`routes_mikrotrans.csv`).
-2. Rewrite `stop_times.csv` so the root dataset only contains bus trips while
-    dumping Mikrotrans trips to `filtered/mikrotrans/stop_times.csv`.
-3. Rewrite `stops.csv` similarly, keeping its bus portion in-place and writing
-    Mikrotrans stops (including shared stops) to `filtered/mikrotrans/stops.csv`.
+Operations performed:
+1. `routes.csv` is rewritten to keep only bus routes while Mikrotrans routes are
+    stored in `data/transjakarta/filtered/mikrotrans/routes.csv`.
+2. `route_list.csv` follows the same rule so the root list is bus-only.
+3. `stop_times.csv` and `stops.csv` are rewritten with bus data only, while all
+    Mikrotrans rows are exported to `filtered/mikrotrans/`.
 """
 
 from __future__ import annotations
@@ -18,14 +18,16 @@ from typing import Iterable, List, Tuple
 ROOT = Path(__file__).resolve().parents[1]
 TRANSJAKARTA_DIR = ROOT / "data" / "transjakarta"
 ROUTES_PATH = TRANSJAKARTA_DIR / "routes.csv"
-BUS_ROUTES_PATH = TRANSJAKARTA_DIR / "routes_bus_only.csv"
-MIKRO_ROUTES_PATH = TRANSJAKARTA_DIR / "routes_mikrotrans.csv"
+ROUTE_LIST_PATH = TRANSJAKARTA_DIR / "route_list.csv"
+
+FILTERED_MIKRO_DIR = TRANSJAKARTA_DIR / "filtered" / "mikrotrans"
+MIKRO_ROUTES_PATH = FILTERED_MIKRO_DIR / "routes.csv"
+MIKRO_ROUTE_LIST_PATH = FILTERED_MIKRO_DIR / "route_list.csv"
 
 TRIPS_PATH = TRANSJAKARTA_DIR / "trips.csv"
 STOP_TIMES_PATH = TRANSJAKARTA_DIR / "stop_times.csv"
 STOPS_PATH = TRANSJAKARTA_DIR / "stops.csv"
 
-FILTERED_MIKRO_DIR = TRANSJAKARTA_DIR / "filtered" / "mikrotrans"
 MIKRO_STOP_TIMES_PATH = FILTERED_MIKRO_DIR / "stop_times.csv"
 MIKRO_STOPS_PATH = FILTERED_MIKRO_DIR / "stops.csv"
 
@@ -76,24 +78,71 @@ def _read_csv(path: Path) -> Tuple[list[str], list[list[str]]]:
     return header, rows
 
 
+def _read_csv_if_exists(path: Path) -> Tuple[list[str], list[list[str]]] | None:
+    if not path.exists():
+        return None
+    return _read_csv(path)
+
+
 def filter_routes() -> set[str]:
     header, rows = _read_csv(ROUTES_PATH)
+    contains_mikro = any(_is_mikrotrans(row[0]) for row in rows)
+
+    if not contains_mikro:
+        extra = _read_csv_if_exists(MIKRO_ROUTES_PATH)
+        if extra:
+            extra_header, extra_rows = extra
+            if extra_header != header:
+                raise ValueError("routes.csv header mismatch with mikro routes file")
+            rows = rows + extra_rows
+
     bus_rows: list[list[str]] = []
     mikro_rows: list[list[str]] = []
 
     for row in rows:
         (mikro_rows if _is_mikrotrans(row[0]) else bus_rows).append(row)
 
-    _write_csv(BUS_ROUTES_PATH, header, bus_rows)
+    _write_csv(ROUTES_PATH, header, bus_rows)
     _write_csv(MIKRO_ROUTES_PATH, header, mikro_rows)
 
     print(
         "Routes filtered.",
-        f"  Bus routes: {len(bus_rows)} -> {BUS_ROUTES_PATH.relative_to(ROOT)}",
+        f"  Bus routes: {len(bus_rows)} (rewrote {ROUTES_PATH.relative_to(ROOT)})",
         f"  Mikro routes: {len(mikro_rows)} -> {MIKRO_ROUTES_PATH.relative_to(ROOT)}",
     )
 
     return {row[0] for row in mikro_rows}
+
+
+def filter_route_list(mikro_route_ids: set[str]) -> None:
+    header, rows = _read_csv(ROUTE_LIST_PATH)
+    contains_mikro = any(row[0] in mikro_route_ids for row in rows)
+
+    if not contains_mikro:
+        extra = _read_csv_if_exists(MIKRO_ROUTE_LIST_PATH)
+        if extra:
+            extra_header, extra_rows = extra
+            if extra_header != header:
+                raise ValueError("route_list.csv header mismatch with mikro route_list file")
+            rows = rows + extra_rows
+
+    bus_rows: list[list[str]] = []
+    mikro_rows: list[list[str]] = []
+
+    for row in rows:
+        if row[0] in mikro_route_ids:
+            mikro_rows.append(row)
+        else:
+            bus_rows.append(row)
+
+    _write_csv(ROUTE_LIST_PATH, header, bus_rows)
+    _write_csv(MIKRO_ROUTE_LIST_PATH, header, mikro_rows)
+
+    print(
+        "route_list filtered.",
+        f"  Bus rows: {len(bus_rows)} (rewrote {ROUTE_LIST_PATH.relative_to(ROOT)})",
+        f"  Mikro rows: {len(mikro_rows)} -> {MIKRO_ROUTE_LIST_PATH.relative_to(ROOT)}",
+    )
 
 
 def collect_mikrotrans_trip_ids(mikro_route_ids: set[str]) -> set[str]:
@@ -105,6 +154,16 @@ def collect_mikrotrans_trip_ids(mikro_route_ids: set[str]) -> set[str]:
 
 def filter_stop_times(mikro_trip_ids: set[str]) -> Tuple[set[str], set[str]]:
     header, rows = _read_csv(STOP_TIMES_PATH)
+    contains_mikro = any(row[0] in mikro_trip_ids for row in rows)
+
+    if mikro_trip_ids and not contains_mikro:
+        extra = _read_csv_if_exists(MIKRO_STOP_TIMES_PATH)
+        if extra:
+            extra_header, extra_rows = extra
+            if extra_header != header:
+                raise ValueError("stop_times.csv header mismatch with mikro stop_times file")
+            rows = rows + extra_rows
+
     bus_rows: list[list[str]] = []
     mikro_rows: list[list[str]] = []
     bus_stop_ids: set[str] = set()
@@ -133,6 +192,20 @@ def filter_stop_times(mikro_trip_ids: set[str]) -> Tuple[set[str], set[str]]:
 
 def filter_stops(bus_stop_ids: set[str], mikro_stop_ids: set[str]) -> None:
     header, rows = _read_csv(STOPS_PATH)
+    existing_stop_ids = {row[0] for row in rows}
+    missing_mikro_ids = mikro_stop_ids - existing_stop_ids
+
+    if missing_mikro_ids:
+        extra = _read_csv_if_exists(MIKRO_STOPS_PATH)
+        if extra:
+            extra_header, extra_rows = extra
+            if extra_header != header:
+                raise ValueError("stops.csv header mismatch with mikro stops file")
+            for row in extra_rows:
+                if row[0] in missing_mikro_ids:
+                    rows.append(row)
+        else:
+            print("Warning: mikrotrans stops missing from both base and filtered datasets")
 
     mikro_rows: list[list[str]] = []
     bus_rows: list[list[str]] = []
@@ -170,6 +243,7 @@ def main() -> None:
     mikro_route_ids = filter_routes()
     mikro_trip_ids = collect_mikrotrans_trip_ids(mikro_route_ids)
     bus_stop_ids, mikro_stop_ids = filter_stop_times(mikro_trip_ids)
+    filter_route_list(mikro_route_ids)
     filter_stops(bus_stop_ids, mikro_stop_ids)
 
 
