@@ -19,10 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 TRANSJAKARTA_DIR = ROOT / "data" / "transjakarta"
 ROUTES_PATH = TRANSJAKARTA_DIR / "routes.csv"
 ROUTE_LIST_PATH = TRANSJAKARTA_DIR / "route_list.csv"
+HALTE_PATH = TRANSJAKARTA_DIR / "data-lokasi-halte.csv"
 
 FILTERED_MIKRO_DIR = TRANSJAKARTA_DIR / "filtered" / "mikrotrans"
 MIKRO_ROUTES_PATH = FILTERED_MIKRO_DIR / "routes.csv"
 MIKRO_ROUTE_LIST_PATH = FILTERED_MIKRO_DIR / "route_list.csv"
+MIKRO_HALTE_PATH = FILTERED_MIKRO_DIR / "data-lokasi-halte.csv"
 
 TRIPS_PATH = TRANSJAKARTA_DIR / "trips.csv"
 STOP_TIMES_PATH = TRANSJAKARTA_DIR / "stop_times.csv"
@@ -48,7 +50,7 @@ def _read_csv(path: Path) -> Tuple[list[str], list[list[str]]]:
         raise FileNotFoundError(f"Input file not found: {path}")
 
     with path.open("r", encoding="utf-8", newline="") as source:
-        reader = csv.reader(source)
+        reader = csv.reader(source, skipinitialspace=True)
         try:
             raw_header = next(reader)
         except StopIteration as exc:
@@ -231,6 +233,43 @@ def filter_stops(bus_stop_ids: set[str], mikro_stop_ids: set[str]) -> None:
     )
 
 
+def filter_halte() -> None:
+    header, rows = _read_csv(HALTE_PATH)
+    try:
+        jenis_idx = header.index("jenis_halte")
+    except ValueError as exc:
+        raise RuntimeError("Column 'jenis_halte' is missing in data-lokasi-halte.csv") from exc
+
+    contains_non_trans = any(row[jenis_idx].strip().upper() != "TRANSJAKARTA" for row in rows)
+
+    if not contains_non_trans:
+        extra = _read_csv_if_exists(MIKRO_HALTE_PATH)
+        if extra:
+            extra_header, extra_rows = extra
+            if extra_header != header:
+                raise ValueError("data-lokasi-halte.csv header mismatch with mikrotrans copy")
+            rows = rows + extra_rows
+
+    bus_rows: list[list[str]] = []
+    mikro_rows: list[list[str]] = []
+
+    for row in rows:
+        jenis = row[jenis_idx].strip().upper()
+        if jenis == "TRANSJAKARTA":
+            bus_rows.append(row)
+        else:
+            mikro_rows.append(row)
+
+    _write_csv(HALTE_PATH, header, bus_rows)
+    _write_csv(MIKRO_HALTE_PATH, header, mikro_rows)
+
+    print(
+        "data-lokasi-halte filtered.",
+        f"  Transjakarta entries: {len(bus_rows)} (rewrote {HALTE_PATH.relative_to(ROOT)})",
+        f"  Non-Transjakarta entries: {len(mikro_rows)} -> {MIKRO_HALTE_PATH.relative_to(ROOT)}",
+    )
+
+
 def _write_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as target:
@@ -245,6 +284,7 @@ def main() -> None:
     bus_stop_ids, mikro_stop_ids = filter_stop_times(mikro_trip_ids)
     filter_route_list(mikro_route_ids)
     filter_stops(bus_stop_ids, mikro_stop_ids)
+    filter_halte()
 
 
 if __name__ == "__main__":
