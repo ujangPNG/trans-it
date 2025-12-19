@@ -29,7 +29,7 @@ const blockedBots = [
   'SeznamBot'
 ];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const ua = request.headers.get('user-agent') || '';
 
   const forwardedFor = request.headers.get('x-forwarded-for');
