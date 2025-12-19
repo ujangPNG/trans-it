@@ -39,6 +39,7 @@ export default function TestPage() {
     setResult(null);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: any = {};
       
       if (origin) body.origin = origin;
