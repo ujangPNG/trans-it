@@ -7,8 +7,10 @@ import 'leaflet/dist/leaflet.css';
 import { gsap } from 'gsap';
 
 // Fix Leaflet default icon issue with Next.js
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+if ('_getIconUrl' in L.Icon.Default.prototype) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+}
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -60,7 +62,7 @@ function FitBounds({ coordinates }: { coordinates: [number, number][] }) {
   return null;
 }
 
-export default function RouteMap({ route, origin, destination }: RouteMapProps) {
+export default function RouteMap({ route, origin }: RouteMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,9 +95,6 @@ export default function RouteMap({ route, origin, destination }: RouteMapProps) 
   const allCoordinates = [...routeCoordinates];
   if (origin) {
     allCoordinates.unshift([origin.lat, origin.lon]);
-  }
-  if (destination && routeCoordinates.length > 0) {
-    // Destination is usually the last coordinate in the route
   }
 
   // Custom icons

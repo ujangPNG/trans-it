@@ -22,6 +22,10 @@ export default function RouteSearchForm({ onSearch, isLoading }: RouteSearchForm
 
   const formRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const originLatRef = useRef<HTMLInputElement>(null);
+  const originLonRef = useRef<HTMLInputElement>(null);
+  const destLatRef = useRef<HTMLInputElement>(null);
+  const destLonRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // GSAP entrance animation
@@ -46,18 +50,28 @@ export default function RouteSearchForm({ onSearch, isLoading }: RouteSearchForm
         if (isOrigin) {
           setOriginLat(position.coords.latitude.toFixed(6));
           setOriginLon(position.coords.longitude.toFixed(6));
+          
+          // Animate the origin input fields
+          if (originLatRef.current && originLonRef.current) {
+            gsap.fromTo(
+              [originLatRef.current, originLonRef.current],
+              { scale: 1.05, backgroundColor: '#dcfce7' },
+              { scale: 1, backgroundColor: '#ffffff', duration: 0.5 }
+            );
+          }
         } else {
           setDestinationLat(position.coords.latitude.toFixed(6));
           setDestinationLon(position.coords.longitude.toFixed(6));
+          
+          // Animate the destination input fields
+          if (destLatRef.current && destLonRef.current) {
+            gsap.fromTo(
+              [destLatRef.current, destLonRef.current],
+              { scale: 1.05, backgroundColor: '#dcfce7' },
+              { scale: 1, backgroundColor: '#ffffff', duration: 0.5 }
+            );
+          }
         }
-        
-        // Animate the input fields
-        const inputs = document.querySelectorAll(isOrigin ? '.origin-input' : '.destination-input');
-        gsap.fromTo(
-          inputs,
-          { scale: 1.05, backgroundColor: '#dcfce7' },
-          { scale: 1, backgroundColor: '#ffffff', duration: 0.5 }
-        );
       },
       (error) => {
         setLocationError('Unable to retrieve your location: ' + error.message);
@@ -119,19 +133,21 @@ export default function RouteSearchForm({ onSearch, isLoading }: RouteSearchForm
           </label>
           <div className="grid grid-cols-2 gap-2 mb-2">
             <input
+              ref={originLatRef}
               type="text"
               placeholder="Latitude"
               value={originLat}
               onChange={(e) => setOriginLat(e.target.value)}
-              className="origin-input px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
               required
             />
             <input
+              ref={originLonRef}
               type="text"
               placeholder="Longitude"
               value={originLon}
               onChange={(e) => setOriginLon(e.target.value)}
-              className="origin-input px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
               required
             />
           </div>
@@ -151,19 +167,21 @@ export default function RouteSearchForm({ onSearch, isLoading }: RouteSearchForm
           </label>
           <div className="grid grid-cols-2 gap-2 mb-2">
             <input
+              ref={destLatRef}
               type="text"
               placeholder="Latitude"
               value={destinationLat}
               onChange={(e) => setDestinationLat(e.target.value)}
-              className="destination-input px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
               required
             />
             <input
+              ref={destLonRef}
               type="text"
               placeholder="Longitude"
               value={destinationLon}
               onChange={(e) => setDestinationLon(e.target.value)}
-              className="destination-input px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
               required
             />
           </div>
