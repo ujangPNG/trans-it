@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import networkx as nx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, ConfigDict, Field
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
@@ -187,6 +190,17 @@ app = FastAPI(
     description="Backend facade over the fare-aware routing engine (port 25200).",
 )
 
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+
+
+def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> str:
+    """Verify that the API key matches the configured INTERNAL_API_KEY."""
+    if not INTERNAL_API_KEY:
+        raise HTTPException(status_code=500, detail="API key not configured")
+    if x_api_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    return x_api_key
+
 
 @app.get("/health")
 def healthcheck() -> Dict[str, object]:
@@ -205,7 +219,9 @@ def tes():
     }
 
 @app.post("/route", response_model=RouteResponse)
-def compute_route(payload: RouteRequest) -> RouteResponse:
+def compute_route(
+    payload: RouteRequest, api_key: str = Depends(verify_api_key)
+) -> RouteResponse:
     engine = get_engine()
     if payload.origin is None and payload.origin_lat is None and payload.origin_lon is None:
         raise HTTPException(status_code=400, detail="origin or originLat/originLon is required")
@@ -260,6 +276,19 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph) -> StepResponse:
     to_attrs = graph.nodes.get(step.to_stop_id, {})
     to_coordinates = _coords_from_attrs(to_attrs)
 
+    # Get route_id, handling potential nan values
+    route_id = step.attributes.get("route_id") or step.attributes.get("name")
+    if route_id is not None:
+        try:
+            # Convert to string and check if it's valid
+            route_id_str = str(route_id)
+            if route_id_str.lower() in ('nan', 'none', ''):
+                route_id = None
+            else:
+                route_id = route_id_str
+        except:
+            route_id = None
+
     return StepResponse(
         from_stop_id=step.from_stop_id,
         from_stop_name=from_attrs.get("stop_name"),
@@ -268,7 +297,7 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph) -> StepResponse:
         edge_type=step.edge_type,
         cost=step.cost,
         time_seconds=step.time_seconds,
-        route_id=step.attributes.get("route_id") or step.attributes.get("name"),
+        route_id=route_id,
         notes=step.attributes.get("notes"),
         to_coordinates=to_coordinates,
     )
