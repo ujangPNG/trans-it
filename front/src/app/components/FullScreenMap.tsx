@@ -31,6 +31,7 @@ interface StepResponse {
   cost: number;
   timeSeconds: number;
   routeId?: string;
+  availableRoutes?: string[]; // NEW: All buses available at this stop
   notes?: string;
   toCoordinates?: Coordinate;
 }
@@ -257,7 +258,15 @@ export default function FullScreenMap({
                   {step.routeId && (
                     <>
                       <br />
-                      <span className="text-xs">Rute: {step.routeId}</span>
+                      <span className="text-xs font-semibold">Naik: {step.routeId}</span>
+                    </>
+                  )}
+                  {step.availableRoutes && step.availableRoutes.length > 0 && (
+                    <>
+                      <br />
+                      <span className="text-xs">
+                        Bus tersedia: {step.availableRoutes.join(', ')}
+                      </span>
                     </>
                   )}
                 </Popup>
