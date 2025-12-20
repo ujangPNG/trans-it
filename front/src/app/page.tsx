@@ -46,17 +46,18 @@ export default function Home() {
   const [originMarker, setOriginMarker] = useState<[number, number] | null>(null);
   const [destinationMarker, setDestinationMarker] = useState<[number, number] | null>(null);
   const [markerMode, setMarkerMode] = useState<'origin' | 'destination' | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed
   
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const searchBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Animate sidebar on mount
-    if (sidebarRef.current) {
+    // Animate search bar on mount
+    if (searchBarRef.current) {
       gsap.fromTo(
-        sidebarRef.current,
-        { x: -320 },
-        { x: 0, duration: 0.5, ease: 'power3.out' }
+        searchBarRef.current,
+        { opacity: 0, y: -20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
       );
     }
   }, []);
@@ -151,7 +152,7 @@ export default function Home() {
     if (sidebarRef.current) {
       if (sidebarOpen) {
         gsap.to(sidebarRef.current, {
-          x: -320,
+          x: -360,
           duration: 0.3,
           ease: 'power2.inOut',
         });
@@ -166,12 +167,47 @@ export default function Home() {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const handleSearchBarClick = () => {
+    if (!sidebarOpen) {
+      toggleSidebar();
+    }
+  };
+
   return (
     <div className="h-screen w-screen overflow-hidden flex relative">
+      {/* Top Search Bar - "Mau ke mana?" */}
+      <div
+        ref={searchBarRef}
+        className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1001] w-full max-w-md px-4"
+      >
+        <button
+          onClick={handleSearchBarClick}
+          className="w-full bg-white shadow-lg rounded-full px-6 py-4 flex items-center gap-3 hover:shadow-xl transition-shadow"
+        >
+          <svg
+            className="w-6 h-6 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <span className="text-gray-600 font-medium flex-1 text-left">
+            Mau ke mana?
+          </span>
+        </button>
+      </div>
+
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl z-[1000] overflow-y-auto"
+        className="absolute left-0 top-0 h-full w-[360px] bg-white shadow-2xl z-[1000] overflow-y-auto"
+        style={{ transform: 'translateX(-360px)' }}
       >
         <div className="p-4 space-y-4">
           {/* Header */}
@@ -181,10 +217,10 @@ export default function Home() {
             </h1>
             <button
               onClick={toggleSidebar}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
-              aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Close sidebar"
             >
-              {sidebarOpen ? '✕' : '☰'}
+              ✕
             </button>
           </div>
 
@@ -349,6 +385,7 @@ export default function Home() {
           <div className="text-xs text-gray-500 pt-4 border-t border-gray-200">
             <p className="mb-2">💡 Cara menggunakan:</p>
             <ul className="list-disc list-inside space-y-1 text-[11px]">
+              <li>Klik "Mau ke mana?" di atas untuk mulai</li>
               <li>Klik "Pilih di peta" lalu klik lokasi di peta</li>
               <li>Atau gunakan "Lokasi saya" untuk posisi saat ini</li>
               <li>Marker bisa di-drag untuk menyesuaikan posisi</li>
@@ -357,17 +394,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Sidebar Toggle Button (Mobile) */}
-      {!sidebarOpen && (
-        <button
-          onClick={toggleSidebar}
-          className="absolute left-4 top-4 z-[1001] bg-white shadow-lg p-3 rounded-lg hover:bg-gray-50 lg:hidden"
-          aria-label="Open sidebar"
-        >
-          ☰
-        </button>
-      )}
 
       {/* Full Screen Map */}
       <div className="flex-1 h-full w-full">
