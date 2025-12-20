@@ -111,6 +111,7 @@ class StepResponse(BaseModel):
     route_id: Optional[str] = Field(None, alias="routeId")
     notes: Optional[str] = None
     to_coordinates: Optional[Coordinate] = Field(None, alias="toCoordinates")
+    available_routes: List[str] = Field(default_factory=list, alias="availableRoutes", description="All bus routes passing through this stop")
 
 
 class RouteResponse(BaseModel):
@@ -149,6 +150,8 @@ class RoutingEngine:
     def __init__(self, settings: RouterSettings) -> None:
         self.settings = settings
         self.graph = self._build_graph()
+        self._routes_by_stop: Dict[str, List[str]] = {}
+        self._build_routes_cache()
 
     def _build_graph(self) -> nx.MultiDiGraph:
         manual_groups: Dict[str, List[str]] = {}
@@ -175,8 +178,48 @@ class RoutingEngine:
         )
         return builder.build()
 
+    def _build_routes_cache(self) -> None:
+        """Build a cache of all routes that pass through each stop."""
+        import csv
+        from collections import defaultdict
+        
+        routes_by_stop: Dict[str, set[str]] = defaultdict(set)
+        
+        # Read trips to get route_id for each trip_id
+        trip_to_route: Dict[str, str] = {}
+        if self.settings.trips_path.exists():
+            with self.settings.trips_path.open('r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    trip_id = row.get('trip_id', '').strip()
+                    route_id = row.get('route_id', '').strip()
+                    if trip_id and route_id:
+                        trip_to_route[trip_id] = route_id
+        
+        # Read stop_times to map stops to routes
+        if self.settings.stop_times_path.exists():
+            with self.settings.stop_times_path.open('r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    trip_id = row.get('trip_id', '').strip()
+                    stop_id = row.get('stop_id', '').strip()
+                    if trip_id in trip_to_route and stop_id:
+                        route_id = trip_to_route[trip_id]
+                        routes_by_stop[stop_id].add(route_id)
+        
+        # Convert sets to sorted lists
+        self._routes_by_stop = {
+            stop_id: sorted(routes) 
+            for stop_id, routes in routes_by_stop.items()
+        }
+
+    def get_routes_at_stop(self, stop_id: str) -> List[str]:
+        """Get all bus routes that pass through the given stop."""
+        return self._routes_by_stop.get(stop_id, [])
+
     def rebuild(self) -> None:
         self.graph = self._build_graph()
+        self._build_routes_cache()
 
 
 @lru_cache(maxsize=1)
@@ -251,7 +294,7 @@ def compute_route(
         raise HTTPException(status_code=404, detail=str(err)) from err
 
     summary = format_path_summary(result, engine.graph)
-    steps = [_step_to_response(step, engine.graph) for step in result.steps]
+    steps = [_step_to_response(step, engine.graph, engine) for step in result.steps]
     return RouteResponse(
         total_fare=result.total_fare,
         total_time_seconds=result.total_time_seconds,
@@ -271,7 +314,7 @@ def _build_optional_coordinate(
         raise HTTPException(status_code=400, detail=str(err)) from err
 
 
-def _step_to_response(step: PathStep, graph: nx.MultiDiGraph) -> StepResponse:
+def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEngine) -> StepResponse:
     from_attrs = graph.nodes.get(step.from_stop_id, {})
     to_attrs = graph.nodes.get(step.to_stop_id, {})
     to_coordinates = _coords_from_attrs(to_attrs)
@@ -289,6 +332,9 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph) -> StepResponse:
         except:
             route_id = None
 
+    # Get all available routes at this stop
+    available_routes = engine.get_routes_at_stop(step.to_stop_id)
+
     return StepResponse(
         from_stop_id=step.from_stop_id,
         from_stop_name=from_attrs.get("stop_name"),
@@ -300,6 +346,7 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph) -> StepResponse:
         route_id=route_id,
         notes=step.attributes.get("notes"),
         to_coordinates=to_coordinates,
+        available_routes=available_routes,
     )
 
 

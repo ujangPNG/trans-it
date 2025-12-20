@@ -30,6 +30,7 @@ TRIPS_PATH = TRANSJAKARTA_DIR / "trips.csv"
 STOP_TIMES_PATH = TRANSJAKARTA_DIR / "stop_times.csv"
 STOPS_PATH = TRANSJAKARTA_DIR / "stops.csv"
 
+MIKRO_TRIPS_PATH = FILTERED_MIKRO_DIR / "trips.csv"
 MIKRO_STOP_TIMES_PATH = FILTERED_MIKRO_DIR / "stop_times.csv"
 MIKRO_STOPS_PATH = FILTERED_MIKRO_DIR / "stops.csv"
 
@@ -147,7 +148,46 @@ def filter_route_list(mikro_route_ids: set[str]) -> None:
     )
 
 
+def filter_trips(mikro_route_ids: set[str]) -> set[str]:
+    """Filter trips.csv to separate bus trips from mikrotrans trips."""
+    header, rows = _read_csv(TRIPS_PATH)
+    contains_mikro = any(row[1] in mikro_route_ids for row in rows)
+
+    if not contains_mikro:
+        extra = _read_csv_if_exists(MIKRO_TRIPS_PATH)
+        if extra:
+            extra_header, extra_rows = extra
+            if extra_header != header:
+                raise ValueError("trips.csv header mismatch with mikro trips file")
+            rows = rows + extra_rows
+
+    bus_rows: list[list[str]] = []
+    mikro_rows: list[list[str]] = []
+    mikro_trip_ids: set[str] = set()
+
+    for row in rows:
+        trip_id = row[0]
+        route_id = row[1]
+        if route_id in mikro_route_ids:
+            mikro_rows.append(row)
+            mikro_trip_ids.add(trip_id)
+        else:
+            bus_rows.append(row)
+
+    _write_csv(TRIPS_PATH, header, bus_rows)
+    _write_csv(MIKRO_TRIPS_PATH, header, mikro_rows)
+
+    print(
+        "trips.csv filtered.",
+        f"  Bus trips: {len(bus_rows)} (rewrote {TRIPS_PATH.relative_to(ROOT)})",
+        f"  Mikro trips: {len(mikro_rows)} -> {MIKRO_TRIPS_PATH.relative_to(ROOT)}",
+    )
+
+    return mikro_trip_ids
+
+
 def collect_mikrotrans_trip_ids(mikro_route_ids: set[str]) -> set[str]:
+    """Collect mikrotrans trip IDs from trips.csv (legacy function for compatibility)."""
     _, trip_rows = _read_csv(TRIPS_PATH)
     mikro_trips = {row[0] for row in trip_rows if row[1] in mikro_route_ids}
     print(f"Identified {len(mikro_trips)} mikrotrans trips from trips.csv")
@@ -280,7 +320,7 @@ def _write_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
 
 def main() -> None:
     mikro_route_ids = filter_routes()
-    mikro_trip_ids = collect_mikrotrans_trip_ids(mikro_route_ids)
+    mikro_trip_ids = filter_trips(mikro_route_ids)
     bus_stop_ids, mikro_stop_ids = filter_stop_times(mikro_trip_ids)
     filter_route_list(mikro_route_ids)
     filter_stops(bus_stop_ids, mikro_stop_ids)
