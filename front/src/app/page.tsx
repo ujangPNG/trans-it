@@ -28,6 +28,7 @@ interface StepResponse {
   cost: number;
   timeSeconds: number;
   routeId?: string;
+  availableRoutes?: string[]; // NEW: All buses available at this stop
   notes?: string;
   toCoordinates?: Coordinate;
 }
@@ -368,8 +369,29 @@ export default function Home() {
                             )}
                           </div>
                           {step.routeId && (
-                            <div className="mt-1 text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">
-                              {step.routeId}
+                            <div className="mt-2">
+                              <div className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">
+                                Naik: {step.routeId}
+                              </div>
+                            </div>
+                          )}
+                          {step.availableRoutes && step.availableRoutes.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-[9px] text-gray-500 mb-1">Bus tersedia di halte:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {step.availableRoutes.map((route, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded ${
+                                      route === step.routeId
+                                        ? 'bg-blue-600 text-white font-semibold'
+                                        : 'bg-gray-200 text-gray-700'
+                                    }`}
+                                  >
+                                    {route}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
