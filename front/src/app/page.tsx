@@ -14,6 +14,9 @@ const FullScreenMap = dynamic(() => import('./components/FullScreenMap'), {
   ),
 });
 
+// Constants
+const EDGE_TYPE_TRAVEL = 'travel';
+
 interface Coordinate {
   latitude: number;
   longitude: number;
@@ -359,7 +362,7 @@ export default function Home() {
                           <p className="font-semibold text-gray-900 text-sm">
                             {step.fromStopName || step.fromStopId}
                           </p>
-                          {step.routeId && step.edgeType === 'travel' && (
+                          {step.routeId && step.edgeType === EDGE_TYPE_TRAVEL && (
                             <div className="mt-1.5">
                               <div className="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded inline-flex items-center gap-1.5 font-semibold shadow-sm">
                                 <span>🚌</span>
@@ -385,7 +388,7 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-                          {step.availableRoutes && step.availableRoutes.length > 1 && (
+                          {step.availableRoutes && step.availableRoutes.length > 1 && step.routeId && (
                             <div className="mt-2 pt-2 border-t border-gray-100">
                               <p className="text-[9px] text-gray-500 mb-1.5 font-medium">Bus lain tersedia:</p>
                               <div className="flex flex-wrap gap-1">

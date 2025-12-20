@@ -17,6 +17,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+// Constants
+const EDGE_TYPE_TRAVEL = 'travel';
+
 interface Coordinate {
   latitude: number;
   longitude: number;
@@ -258,7 +261,7 @@ export default function FullScreenMap({
                       {step.toCoordinates.latitude.toFixed(6)},{' '}
                       {step.toCoordinates.longitude.toFixed(6)}
                     </span>
-                    {step.routeId && step.edgeType === 'travel' && (
+                    {step.routeId && step.edgeType === EDGE_TYPE_TRAVEL && (
                       <>
                         <br />
                         <span className="text-sm font-semibold text-blue-600">
