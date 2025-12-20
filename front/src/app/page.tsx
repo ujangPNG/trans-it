@@ -47,7 +47,6 @@ export default function Home() {
   const [destinationMarker, setDestinationMarker] = useState<[number, number] | null>(null);
   const [markerMode, setMarkerMode] = useState<'origin' | 'destination' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed
-  const [searchExpanded, setSearchExpanded] = useState(false);
   
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
@@ -169,7 +168,6 @@ export default function Home() {
   };
 
   const handleSearchBarClick = () => {
-    setSearchExpanded(true);
     if (!sidebarOpen) {
       toggleSidebar();
     }
