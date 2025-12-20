@@ -179,11 +179,13 @@ class RoutingEngine:
         return builder.build()
 
     def _build_routes_cache(self) -> None:
-        """Build a cache of all routes that pass through each stop."""
+        """Build a cache of all routes that pass through each stop and stop-to-stop connections."""
         import csv
         from collections import defaultdict
         
         routes_by_stop: Dict[str, set[str]] = defaultdict(set)
+        # Map from (from_stop, to_stop) to set of route_ids that connect them
+        self._routes_between_stops: Dict[Tuple[str, str], set[str]] = defaultdict(set)
         
         # Read trips to get route_id for each trip_id
         trip_to_route: Dict[str, str] = {}
@@ -196,16 +198,43 @@ class RoutingEngine:
                     if trip_id and route_id:
                         trip_to_route[trip_id] = route_id
         
-        # Read stop_times to map stops to routes
+        # Read stop_times to map stops to routes and build connections
         if self.settings.stop_times_path.exists():
+            # Group by trip_id to track sequences
+            trip_stops: Dict[str, List[Tuple[int, str]]] = defaultdict(list)
+            
             with self.settings.stop_times_path.open('r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     trip_id = row.get('trip_id', '').strip()
                     stop_id = row.get('stop_id', '').strip()
+                    stop_sequence = row.get('stop_sequence', '').strip()
+                    
                     if trip_id in trip_to_route and stop_id:
                         route_id = trip_to_route[trip_id]
                         routes_by_stop[stop_id].add(route_id)
+                        
+                        # Track stop sequence for this trip
+                        try:
+                            seq = int(stop_sequence) if stop_sequence else 0
+                            trip_stops[trip_id].append((seq, stop_id))
+                        except ValueError:
+                            pass
+            
+            # Build stop-to-stop connections
+            for trip_id, stops_list in trip_stops.items():
+                if trip_id not in trip_to_route:
+                    continue
+                    
+                route_id = trip_to_route[trip_id]
+                # Sort by sequence
+                stops_list.sort(key=lambda x: x[0])
+                
+                # Create edges for consecutive stops
+                for i in range(len(stops_list) - 1):
+                    from_stop = stops_list[i][1]
+                    to_stop = stops_list[i + 1][1]
+                    self._routes_between_stops[(from_stop, to_stop)].add(route_id)
         
         # Convert sets to sorted lists
         self._routes_by_stop = {
@@ -213,9 +242,19 @@ class RoutingEngine:
             for stop_id, routes in routes_by_stop.items()
         }
 
-    def get_routes_at_stop(self, stop_id: str) -> List[str]:
-        """Get all bus routes that pass through the given stop."""
-        return self._routes_by_stop.get(stop_id, [])
+    def get_routes_at_stop(self, stop_id: str, next_stop_id: Optional[str] = None) -> List[str]:
+        """Get bus routes at the given stop.
+        
+        If next_stop_id is provided, only return routes that go from stop_id to next_stop_id.
+        Otherwise, return all routes that pass through stop_id.
+        """
+        if next_stop_id:
+            # Return only routes that connect these two stops
+            routes = self._routes_between_stops.get((stop_id, next_stop_id), set())
+            return sorted(routes)
+        else:
+            # Return all routes at this stop
+            return self._routes_by_stop.get(stop_id, [])
 
     def rebuild(self) -> None:
         self.graph = self._build_graph()
@@ -332,8 +371,13 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEng
         except:
             route_id = None
 
-    # Get all available routes at this stop
-    available_routes = engine.get_routes_at_stop(step.to_stop_id)
+    # Get available routes at this stop
+    # If this is a travel edge, show only routes that go to the next stop
+    # If this is a transfer, show all routes available at the destination stop
+    if step.edge_type == "travel":
+        available_routes = engine.get_routes_at_stop(step.from_stop_id, step.to_stop_id)
+    else:
+        available_routes = engine.get_routes_at_stop(step.to_stop_id)
 
     return StepResponse(
         from_stop_id=step.from_stop_id,
