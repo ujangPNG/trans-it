@@ -124,7 +124,7 @@ function DraggableMarker({
         <br />
         {position[0].toFixed(6)}, {position[1].toFixed(6)}
         <br />
-        <small>Drag to move</small>
+        <small>Drag to move or use arrow keys</small>
       </Popup>
     </Marker>
   );

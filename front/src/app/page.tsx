@@ -182,6 +182,7 @@ export default function Home() {
             <button
               onClick={toggleSidebar}
               className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+              aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
             >
               {sidebarOpen ? '✕' : '☰'}
             </button>
@@ -362,6 +363,7 @@ export default function Home() {
         <button
           onClick={toggleSidebar}
           className="absolute left-4 top-4 z-[1001] bg-white shadow-lg p-3 rounded-lg hover:bg-gray-50 lg:hidden"
+          aria-label="Open sidebar"
         >
           ☰
         </button>
