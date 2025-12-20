@@ -362,11 +362,22 @@ export default function Home() {
                           <p className="font-semibold text-gray-900 text-sm">
                             {step.fromStopName || step.fromStopId}
                           </p>
-                          {step.routeId && step.edgeType === EDGE_TYPE_TRAVEL && (
+                          {step.edgeType === EDGE_TYPE_TRAVEL ? (
+                            step.routeId && (
+                              <div className="mt-1.5">
+                                <div className="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded inline-flex items-center gap-1.5 font-semibold shadow-sm">
+                                  <span>🚌</span>
+                                  <span>Naik bus {step.routeId}</span>
+                                </div>
+                              </div>
+                            )
+                          ) : (
                             <div className="mt-1.5">
-                              <div className="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded inline-flex items-center gap-1.5 font-semibold shadow-sm">
-                                <span>🚌</span>
-                                <span>Naik bus {step.routeId}</span>
+                              <div className="text-xs bg-orange-100 text-orange-800 px-2.5 py-1.5 rounded inline-flex items-center gap-1.5 font-semibold border border-orange-200">
+                                <span>🚶</span>
+                                <span>
+                                  {step.edgeType === 'internal-transfer' ? 'Transfer dalam halte' : 'Transfer ke halte lain'}
+                                </span>
                               </div>
                             </div>
                           )}
@@ -388,7 +399,7 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-                          {step.availableRoutes && step.availableRoutes.length > 1 && step.routeId && (
+                          {step.edgeType === EDGE_TYPE_TRAVEL && step.availableRoutes && step.availableRoutes.length > 1 && step.routeId && (
                             <div className="mt-2 pt-2 border-t border-gray-100">
                               <p className="text-[9px] text-gray-500 mb-1.5 font-medium">Bus lain tersedia:</p>
                               <div className="flex flex-wrap gap-1">

@@ -261,15 +261,24 @@ export default function FullScreenMap({
                       {step.toCoordinates.latitude.toFixed(6)},{' '}
                       {step.toCoordinates.longitude.toFixed(6)}
                     </span>
-                    {step.routeId && step.edgeType === EDGE_TYPE_TRAVEL && (
+                    {step.edgeType === EDGE_TYPE_TRAVEL ? (
+                      step.routeId && (
+                        <>
+                          <br />
+                          <span className="text-sm font-semibold text-blue-600">
+                            🚌 Naik bus: {step.routeId}
+                          </span>
+                        </>
+                      )
+                    ) : (
                       <>
                         <br />
-                        <span className="text-sm font-semibold text-blue-600">
-                          🚌 Naik bus: {step.routeId}
+                        <span className="text-sm font-semibold text-orange-600">
+                          🚶 Transfer
                         </span>
                       </>
                     )}
-                    {step.availableRoutes && step.availableRoutes.length > 0 && (
+                    {step.edgeType === EDGE_TYPE_TRAVEL && step.availableRoutes && step.availableRoutes.length > 0 && (
                       <>
                         <br />
                         <span className="text-xs text-gray-500">
