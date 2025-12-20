@@ -2,15 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import RouteSearchForm from './components/RouteSearchForm';
-import RouteDisplay from './components/RouteDisplay';
 import { gsap } from 'gsap';
 
-// Dynamically import RouteMap to avoid SSR issues with Leaflet
-const RouteMap = dynamic(() => import('./components/RouteMap'), {
+// Dynamically import FullScreenMap to avoid SSR issues with Leaflet
+const FullScreenMap = dynamic(() => import('./components/FullScreenMap'), {
   ssr: false,
   loading: () => (
-    <div className="bg-white rounded-lg shadow-lg h-[500px] flex items-center justify-center">
+    <div className="h-full w-full flex items-center justify-center bg-gray-200">
       <p className="text-gray-500">Loading map...</p>
     </div>
   ),
@@ -45,33 +43,33 @@ export default function Home() {
   const [route, setRoute] = useState<RouteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [origin, setOrigin] = useState<{ lat: number; lon: number } | undefined>();
-  const [destination, setDestination] = useState<{ lat: number; lon: number } | undefined>();
+  const [originMarker, setOriginMarker] = useState<[number, number] | null>(null);
+  const [destinationMarker, setDestinationMarker] = useState<[number, number] | null>(null);
+  const [markerMode, setMarkerMode] = useState<'origin' | 'destination' | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  const titleRef = useRef<HTMLHeadingElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Animate title on mount
-    if (titleRef.current) {
+    // Animate sidebar on mount
+    if (sidebarRef.current) {
       gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: -50 },
-        { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }
+        sidebarRef.current,
+        { x: -320 },
+        { x: 0, duration: 0.5, ease: 'power3.out' }
       );
     }
   }, []);
 
-  const handleSearch = async (data: {
-    originLat: number;
-    originLon: number;
-    destinationLat: number;
-    destinationLon: number;
-  }) => {
+  const handleSearch = async () => {
+    if (!originMarker || !destinationMarker) {
+      setError('Please select both origin and destination on the map');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setRoute(null);
-    setOrigin({ lat: data.originLat, lon: data.originLon });
-    setDestination({ lat: data.destinationLat, lon: data.destinationLon });
 
     try {
       const response = await fetch('/api/route', {
@@ -80,10 +78,10 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          originLat: data.originLat,
-          originLon: data.originLon,
-          destinationLat: data.destinationLat,
-          destinationLon: data.destinationLon,
+          originLat: originMarker[0],
+          originLon: originMarker[1],
+          destinationLat: destinationMarker[0],
+          destinationLon: destinationMarker[1],
         }),
       });
 
@@ -101,35 +99,284 @@ export default function Home() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <header className="text-center mb-8">
-          <h1
-            ref={titleRef}
-            className="text-4xl md:text-5xl font-bold text-gray-800 mb-2"
-          >
-            🚌 TransJakarta Route Finder
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Temukan rute TransJakarta termurah dan tercepat
-          </p>
-        </header>
+  const handleOriginChange = (lat: number, lon: number) => {
+    setOriginMarker([lat, lon]);
+    setMarkerMode(null);
+  };
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Search Form and Results */}
-          <div className="space-y-6">
-            <RouteSearchForm onSearch={handleSearch} isLoading={isLoading} />
-            {(route || error) && <RouteDisplay route={route} error={error} />}
+  const handleDestinationChange = (lat: number, lon: number) => {
+    setDestinationMarker([lat, lon]);
+    setMarkerMode(null);
+  };
+
+  const getCurrentLocation = (isOrigin: boolean) => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+        if (isOrigin) {
+          setOriginMarker(coords);
+        } else {
+          setDestinationMarker(coords);
+        }
+      },
+      (err) => {
+        setError('Unable to retrieve your location: ' + err.message);
+      }
+    );
+  };
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes} mnt ${secs > 0 ? `${secs} dtk` : ''}`;
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const toggleSidebar = () => {
+    if (sidebarRef.current) {
+      if (sidebarOpen) {
+        gsap.to(sidebarRef.current, {
+          x: -320,
+          duration: 0.3,
+          ease: 'power2.inOut',
+        });
+      } else {
+        gsap.to(sidebarRef.current, {
+          x: 0,
+          duration: 0.3,
+          ease: 'power2.inOut',
+        });
+      }
+    }
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  return (
+    <div className="h-screen w-screen overflow-hidden flex relative">
+      {/* Sidebar */}
+      <div
+        ref={sidebarRef}
+        className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl z-[1000] overflow-y-auto"
+      >
+        <div className="p-4 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold text-gray-800">
+              🚌 TransJakarta
+            </h1>
+            <button
+              onClick={toggleSidebar}
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+            >
+              {sidebarOpen ? '✕' : '☰'}
+            </button>
           </div>
 
-          {/* Right Column - Map */}
-          <div className="lg:sticky lg:top-8 h-fit">
-            <RouteMap route={route} origin={origin} destination={destination} />
+          {/* Location Selection */}
+          <div className="space-y-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📍 Titik Awal
+              </label>
+              {originMarker ? (
+                <div className="text-xs text-gray-600 mb-2">
+                  {originMarker[0].toFixed(6)}, {originMarker[1].toFixed(6)}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 mb-2">
+                  Belum dipilih
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMarkerMode('origin')}
+                  className={`flex-1 px-3 py-2 text-xs rounded-md font-medium transition-colors ${
+                    markerMode === 'origin'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+                >
+                  {markerMode === 'origin' ? 'Klik peta...' : 'Pilih di peta'}
+                </button>
+                <button
+                  onClick={() => getCurrentLocation(true)}
+                  className="px-3 py-2 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md font-medium"
+                >
+                  Lokasi saya
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🎯 Tujuan
+              </label>
+              {destinationMarker ? (
+                <div className="text-xs text-gray-600 mb-2">
+                  {destinationMarker[0].toFixed(6)}, {destinationMarker[1].toFixed(6)}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 mb-2">
+                  Belum dipilih
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMarkerMode('destination')}
+                  className={`flex-1 px-3 py-2 text-xs rounded-md font-medium transition-colors ${
+                    markerMode === 'destination'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  }`}
+                >
+                  {markerMode === 'destination' ? 'Klik peta...' : 'Pilih di peta'}
+                </button>
+                <button
+                  onClick={() => getCurrentLocation(false)}
+                  className="px-3 py-2 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md font-medium"
+                >
+                  Lokasi saya
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Button */}
+          <button
+            onClick={handleSearch}
+            disabled={isLoading || !originMarker || !destinationMarker}
+            className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-colors ${
+              isLoading || !originMarker || !destinationMarker
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {isLoading ? 'Mencari rute...' : 'Cari Rute Termurah'}
+          </button>
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-300 rounded-lg p-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Route Results */}
+          {route && (
+            <div className="space-y-3">
+              {/* Summary */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-600">Total Biaya</p>
+                    <p className="text-lg font-bold text-blue-700">
+                      {formatCurrency(route.totalFare)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600">Waktu Tempuh</p>
+                    <p className="text-lg font-bold text-blue-700">
+                      {formatTime(route.totalTimeSeconds)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Steps */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-gray-700">
+                  Langkah Perjalanan ({route.steps.length})
+                </h3>
+                <div className="max-h-[calc(100vh-500px)] overflow-y-auto space-y-2">
+                  {route.steps.map((step, index) => (
+                    <div
+                      key={index}
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-shrink-0">
+                          <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-[10px]">
+                            {index + 1}
+                          </div>
+                        </div>
+                        <div className="flex-grow">
+                          <p className="font-semibold text-gray-800">
+                            {step.fromStopName || step.fromStopId}
+                          </p>
+                          <p className="text-gray-400 my-1">↓</p>
+                          <p className="font-semibold text-gray-800">
+                            {step.toStopName || step.toStopId}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500">
+                            <span>⏱ {formatTime(step.timeSeconds)}</span>
+                            {step.cost > 0 && (
+                              <span className="text-green-600 font-semibold">
+                                💰 {formatCurrency(step.cost)}
+                              </span>
+                            )}
+                          </div>
+                          {step.routeId && (
+                            <div className="mt-1 text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">
+                              {step.routeId}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info */}
+          <div className="text-xs text-gray-500 pt-4 border-t border-gray-200">
+            <p className="mb-2">💡 Cara menggunakan:</p>
+            <ul className="list-disc list-inside space-y-1 text-[11px]">
+              <li>Klik "Pilih di peta" lalu klik lokasi di peta</li>
+              <li>Atau gunakan "Lokasi saya" untuk posisi saat ini</li>
+              <li>Marker bisa di-drag untuk menyesuaikan posisi</li>
+              <li>Klik "Cari Rute Termurah" untuk hasil</li>
+            </ul>
           </div>
         </div>
+      </div>
+
+      {/* Sidebar Toggle Button (Mobile) */}
+      {!sidebarOpen && (
+        <button
+          onClick={toggleSidebar}
+          className="absolute left-4 top-4 z-[1001] bg-white shadow-lg p-3 rounded-lg hover:bg-gray-50 lg:hidden"
+        >
+          ☰
+        </button>
+      )}
+
+      {/* Full Screen Map */}
+      <div className="flex-1 h-full w-full">
+        <FullScreenMap
+          route={route}
+          originMarker={originMarker}
+          destinationMarker={destinationMarker}
+          onOriginChange={handleOriginChange}
+          onDestinationChange={handleDestinationChange}
+          markerMode={markerMode}
+        />
       </div>
     </div>
   );
