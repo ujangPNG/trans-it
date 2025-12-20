@@ -251,24 +251,30 @@ export default function FullScreenMap({
                 ]}
               >
                 <Popup>
-                  <strong>{step.toStopName || step.toStopId}</strong>
-                  <br />
-                  {step.toCoordinates.latitude.toFixed(6)},{' '}
-                  {step.toCoordinates.longitude.toFixed(6)}
-                  {step.routeId && (
-                    <>
-                      <br />
-                      <span className="text-xs font-semibold">Naik: {step.routeId}</span>
-                    </>
-                  )}
-                  {step.availableRoutes && step.availableRoutes.length > 0 && (
-                    <>
-                      <br />
-                      <span className="text-xs">
-                        Bus tersedia: {step.availableRoutes.join(', ')}
-                      </span>
-                    </>
-                  )}
+                  <div className="text-sm">
+                    <strong className="text-base">{step.toStopName || step.toStopId}</strong>
+                    <br />
+                    <span className="text-xs text-gray-600">
+                      {step.toCoordinates.latitude.toFixed(6)},{' '}
+                      {step.toCoordinates.longitude.toFixed(6)}
+                    </span>
+                    {step.routeId && step.edgeType === 'travel' && (
+                      <>
+                        <br />
+                        <span className="text-sm font-semibold text-blue-600">
+                          🚌 Naik bus: {step.routeId}
+                        </span>
+                      </>
+                    )}
+                    {step.availableRoutes && step.availableRoutes.length > 0 && (
+                      <>
+                        <br />
+                        <span className="text-xs text-gray-500">
+                          Bus tersedia: {step.availableRoutes.join(', ')}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </Popup>
               </Marker>
             );

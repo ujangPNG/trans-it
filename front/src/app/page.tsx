@@ -212,16 +212,19 @@ export default function Home() {
       >
         <div className="p-4 space-y-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-gray-800">
-              🚌 TransJakarta
+          <div className="flex items-center justify-between mb-2 pb-3 border-b border-gray-200">
+            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <span>🚌</span>
+              <span>TransJakarta</span>
             </h1>
             <button
               onClick={toggleSidebar}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Close sidebar"
             >
-              ✕
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
 
@@ -344,53 +347,58 @@ export default function Home() {
                   {route.steps.map((step, index) => (
                     <div
                       key={index}
-                      className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs"
+                      className="bg-white border-2 border-gray-200 rounded-lg p-3 text-xs hover:border-blue-300 transition-colors"
                     >
                       <div className="flex items-start gap-2">
                         <div className="flex-shrink-0">
-                          <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-[10px]">
+                          <div className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-[11px] shadow-sm">
                             {index + 1}
                           </div>
                         </div>
                         <div className="flex-grow">
-                          <p className="font-semibold text-gray-800">
+                          <p className="font-semibold text-gray-900 text-sm">
                             {step.fromStopName || step.fromStopId}
                           </p>
-                          <p className="text-gray-400 my-1">↓</p>
-                          <p className="font-semibold text-gray-800">
-                            {step.toStopName || step.toStopId}
-                          </p>
-                          <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500">
-                            <span>⏱ {formatTime(step.timeSeconds)}</span>
-                            {step.cost > 0 && (
-                              <span className="text-green-600 font-semibold">
-                                💰 {formatCurrency(step.cost)}
-                              </span>
-                            )}
-                          </div>
-                          {step.routeId && (
-                            <div className="mt-2">
-                              <div className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block">
-                                Naik: {step.routeId}
+                          {step.routeId && step.edgeType === 'travel' && (
+                            <div className="mt-1.5">
+                              <div className="text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded inline-flex items-center gap-1.5 font-semibold shadow-sm">
+                                <span>🚌</span>
+                                <span>Naik bus {step.routeId}</span>
                               </div>
                             </div>
                           )}
-                          {step.availableRoutes && step.availableRoutes.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-[9px] text-gray-500 mb-1">Bus tersedia di halte:</p>
+                          <div className="my-2 flex items-center gap-1">
+                            <div className="w-0.5 h-4 bg-gray-300"></div>
+                          </div>
+                          <p className="font-semibold text-gray-900 text-sm">
+                            {step.toStopName || step.toStopId}
+                          </p>
+                          <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-600">
+                            <span className="flex items-center gap-1">
+                              <span>⏱</span>
+                              <span>{formatTime(step.timeSeconds)}</span>
+                            </span>
+                            {step.cost > 0 && (
+                              <span className="flex items-center gap-1 text-green-600 font-semibold">
+                                <span>💰</span>
+                                <span>{formatCurrency(step.cost)}</span>
+                              </span>
+                            )}
+                          </div>
+                          {step.availableRoutes && step.availableRoutes.length > 1 && (
+                            <div className="mt-2 pt-2 border-t border-gray-100">
+                              <p className="text-[9px] text-gray-500 mb-1.5 font-medium">Bus lain tersedia:</p>
                               <div className="flex flex-wrap gap-1">
-                                {step.availableRoutes.map((route, idx) => (
-                                  <span
-                                    key={idx}
-                                    className={`text-[9px] px-1.5 py-0.5 rounded ${
-                                      route === step.routeId
-                                        ? 'bg-blue-600 text-white font-semibold'
-                                        : 'bg-gray-200 text-gray-700'
-                                    }`}
-                                  >
-                                    {route}
-                                  </span>
-                                ))}
+                                {step.availableRoutes
+                                  .filter(route => route !== step.routeId)
+                                  .map((route, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="text-[9px] px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200"
+                                    >
+                                      {route}
+                                    </span>
+                                  ))}
                               </div>
                             </div>
                           )}
