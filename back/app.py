@@ -111,7 +111,17 @@ class StepResponse(BaseModel):
     route_id: Optional[str] = Field(None, alias="routeId")
     notes: Optional[str] = None
     to_coordinates: Optional[Coordinate] = Field(None, alias="toCoordinates")
-    available_routes: List[str] = Field(default_factory=list, alias="availableRoutes", description="All bus routes passing through this stop")
+    available_routes: List[str] = Field(
+        default_factory=list,
+        alias="availableRoutes",
+        description="All bus routes available at the relevant stop",
+    )
+    recommended_routes: List[str] = Field(
+        default_factory=list,
+        alias="recommendedRoutes",
+        description="Routes that directly serve the next stop in this step",
+    )
+    is_transfer: bool = Field(False, alias="isTransfer", description="True when this step is a transfer between routes")
 
 
 class RouteResponse(BaseModel):
@@ -354,6 +364,7 @@ def _build_optional_coordinate(
 
 
 def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEngine) -> StepResponse:
+    # Translate an internal PathStep into the API-friendly StepResponse.
     from_attrs = graph.nodes.get(step.from_stop_id, {})
     to_attrs = graph.nodes.get(step.to_stop_id, {})
     to_coordinates = _coords_from_attrs(to_attrs)
@@ -368,16 +379,44 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEng
                 route_id = None
             else:
                 route_id = route_id_str
-        except:
+        except Exception:
             route_id = None
 
-    # Get available routes at this stop
-    # If this is a travel edge, show only routes that go to the next stop
-    # If this is a transfer, show all routes available at the destination stop
-    if step.edge_type == "travel":
-        available_routes = engine.get_routes_at_stop(step.from_stop_id, step.to_stop_id)
+    is_transfer = step.edge_type != "travel"
+
+    # For travel edges: recommended_routes are the routes that directly connect from_stop -> to_stop.
+    # available_routes are all routes at the origin stop (what the rider can board here).
+    # If file-derived lookups are empty, fall back to graph edges so the user still gets guidance.
+    # Fallback order for route_id: edge attributes -> recommended_routes -> available_routes.
+    if not is_transfer:
+        recommended_routes = engine.get_routes_at_stop(step.from_stop_id, step.to_stop_id)
+        available_routes = engine.get_routes_at_stop(step.from_stop_id)
+
+        # Keep recommendations non-empty; if no directional match, use all available routes at origin.
+        if not recommended_routes:
+            recommended_routes = available_routes
+
+        # If still empty, derive from graph edges (directional first, then any outgoing).
+        if not recommended_routes:
+            recommended_routes = _graph_routes(graph, step.from_stop_id, step.to_stop_id)
+        if not recommended_routes:
+            recommended_routes = _graph_routes(graph, step.from_stop_id)
+        if not available_routes:
+            available_routes = _graph_routes(graph, step.from_stop_id)
+
+        if route_id is None and recommended_routes:
+            route_id = recommended_routes[0]
+        elif route_id is None and available_routes:
+            route_id = available_routes[0]
     else:
+        # Transfer edges: show all routes at the destination stop; also surface them as recommendations to board next.
+        recommended_routes = engine.get_routes_at_stop(step.to_stop_id)
         available_routes = engine.get_routes_at_stop(step.to_stop_id)
+
+        if not recommended_routes:
+            recommended_routes = _graph_routes(graph, step.to_stop_id)
+        if not available_routes:
+            available_routes = recommended_routes
 
     return StepResponse(
         from_stop_id=step.from_stop_id,
@@ -391,6 +430,8 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEng
         notes=step.attributes.get("notes"),
         to_coordinates=to_coordinates,
         available_routes=available_routes,
+        recommended_routes=recommended_routes,
+        is_transfer=is_transfer,
     )
 
 
@@ -400,3 +441,27 @@ def _coords_from_attrs(attrs: Dict[str, object]) -> Optional[Coordinate]:
     if lat is None or lon is None:
         return None
     return Coordinate(lat=lat, lon=lon)
+
+
+def _graph_routes(
+    graph: nx.MultiDiGraph, from_stop: str, to_stop: Optional[str] = None
+) -> List[str]:
+    """Derive routes from graph edges when CSV-based cache is empty.
+
+    If to_stop is provided, only include edges that lead to that stop.
+    Otherwise, include all outgoing edges from from_stop.
+    """
+    routes: set[str] = set()
+    if from_stop not in graph:
+        return []
+    for _, neighbor, edge_data in graph.out_edges(from_stop, data=True):
+        if to_stop and neighbor != to_stop:
+            continue
+        route_id = edge_data.get("route_id") or edge_data.get("name")
+        if route_id is None:
+            continue
+        route_id_str = str(route_id).strip()
+        if not route_id_str or route_id_str.lower() in {"nan", "none"}:
+            continue
+        routes.add(route_id_str)
+    return sorted(routes)
