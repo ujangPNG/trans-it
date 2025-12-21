@@ -33,9 +33,9 @@ interface StepResponse {
   edgeType: string;
   cost: number;
   timeSeconds: number;
-  routeId?: string;
+  routeId?: string | null;
   availableRoutes?: string[]; // NEW: All buses available at this stop
-  notes?: string;
+  notes?: string | null;
   toCoordinates?: Coordinate;
 }
 
@@ -48,29 +48,29 @@ interface RouteResponse {
 
 interface FullScreenMapProps {
   route: RouteResponse | null;
-  originMarker: [number, number] | null;
-  destinationMarker: [number, number] | null;
-  onOriginChange: (lat: number, lon: number) => void;
-  onDestinationChange: (lat: number, lon: number) => void;
-  markerMode: 'origin' | 'destination' | null;
+  origin: Coordinate | null;
+  destination: Coordinate | null;
+  onMapClick: (lat: number, lng: number) => void;
+  onOriginDrag: (lat: number, lng: number) => void;
+  onDestinationDrag: (lat: number, lng: number) => void;
+  pickingOrigin: boolean;
+  pickingDestination: boolean;
 }
 
 // Component to handle map clicks for placing markers
 function MapClickHandler({ 
-  onOriginChange, 
-  onDestinationChange, 
-  markerMode 
+  onMapClick,
+  pickingOrigin,
+  pickingDestination
 }: { 
-  onOriginChange: (lat: number, lon: number) => void;
-  onDestinationChange: (lat: number, lon: number) => void;
-  markerMode: 'origin' | 'destination' | null;
+  onMapClick: (lat: number, lng: number) => void;
+  pickingOrigin: boolean;
+  pickingDestination: boolean;
 }) {
   useMapEvents({
     click(e) {
-      if (markerMode === 'origin') {
-        onOriginChange(e.latlng.lat, e.latlng.lng);
-      } else if (markerMode === 'destination') {
-        onDestinationChange(e.latlng.lat, e.latlng.lng);
+      if (pickingOrigin || pickingDestination) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
       }
     },
   });
@@ -136,11 +136,13 @@ function DraggableMarker({
 
 export default function FullScreenMap({
   route,
-  originMarker,
-  destinationMarker,
-  onOriginChange,
-  onDestinationChange,
-  markerMode,
+  origin,
+  destination,
+  onMapClick,
+  onOriginDrag,
+  onDestinationDrag,
+  pickingOrigin,
+  pickingDestination,
 }: FullScreenMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
 
@@ -169,6 +171,10 @@ export default function FullScreenMap({
       }
     });
   }
+
+  // Convert to marker positions
+  const originMarker: [number, number] | null = origin ? [origin.latitude, origin.longitude] : null;
+  const destinationMarker: [number, number] | null = destination ? [destination.latitude, destination.longitude] : null;
 
   // Collect all coordinates for bounds
   const allCoordinates = [...routeCoordinates];
@@ -214,16 +220,16 @@ export default function FullScreenMap({
 
         {/* Map click handler for placing markers */}
         <MapClickHandler
-          onOriginChange={onOriginChange}
-          onDestinationChange={onDestinationChange}
-          markerMode={markerMode}
+          onMapClick={onMapClick}
+          pickingOrigin={pickingOrigin}
+          pickingDestination={pickingDestination}
         />
 
         {/* Origin marker (draggable) */}
         {originMarker && (
           <DraggableMarker
             position={originMarker}
-            onChange={onOriginChange}
+            onChange={onOriginDrag}
             icon={startIcon}
             label="Titik Awal"
           />
@@ -233,7 +239,7 @@ export default function FullScreenMap({
         {destinationMarker && (
           <DraggableMarker
             position={destinationMarker}
-            onChange={onDestinationChange}
+            onChange={onDestinationDrag}
             icon={endIcon}
             label="Tujuan"
           />
@@ -244,7 +250,6 @@ export default function FullScreenMap({
           route.steps.map((step, index) => {
             if (!step.toCoordinates) return null;
             
-            const isLast = index === route.steps.length - 1;
             return (
               <Marker
                 key={index}
@@ -265,7 +270,7 @@ export default function FullScreenMap({
                       step.routeId && (
                         <>
                           <br />
-                          <span className="text-sm font-semibold text-blue-600">
+                          <span className="text-sm font-semibold" style={{ color: '#FFC107' }}>
                             🚌 Naik bus: {step.routeId}
                           </span>
                         </>
@@ -273,7 +278,7 @@ export default function FullScreenMap({
                     ) : (
                       <>
                         <br />
-                        <span className="text-sm font-semibold text-orange-600">
+                        <span className="text-sm font-semibold" style={{ color: '#1a1a1a' }}>
                           🚶 Transfer
                         </span>
                       </>
@@ -296,9 +301,9 @@ export default function FullScreenMap({
         {routeCoordinates.length > 0 && (
           <Polyline
             positions={routeCoordinates}
-            color="#3b82f6"
-            weight={4}
-            opacity={0.7}
+            color="#FFC107"
+            weight={5}
+            opacity={0.8}
           />
         )}
 
