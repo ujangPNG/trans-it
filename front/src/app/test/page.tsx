@@ -21,6 +21,15 @@ interface RouteResponse {
   summary: string;
 }
 
+interface RouteRequestBody {
+  origin?: string;
+  destination?: string;
+  originLat?: number;
+  originLon?: number;
+  destinationLat?: number;
+  destinationLon?: number;
+}
+
 export default function TestPage() {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -39,7 +48,7 @@ export default function TestPage() {
     setResult(null);
 
     try {
-      const body: any = {};
+      const body: RouteRequestBody = {};
       
       if (origin) body.origin = origin;
       if (destination) body.destination = destination;

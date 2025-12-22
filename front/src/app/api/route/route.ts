@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
 
     // Call backend API with API key
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:25200';
-    const apiKey = process.env.INTERNAL_API_KEY;
+    // Trim quotes from API key in case someone wraps it in quotes
+    const apiKey = process.env.INTERNAL_API_KEY?.replace(/^['"]|['"]$/g, '');
 
     if (!apiKey) {
       return NextResponse.json(
