@@ -38,10 +38,11 @@ export async function POST(request: NextRequest) {
   try {
     const body: RouteRequestBody = await request.json();
 
-    // Call backend API with API key
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:25200';
-    // Trim quotes from API key in case someone wraps it in quotes
     const apiKey = process.env.INTERNAL_API_KEY?.replace(/^['"]|['"]$/g, '');
+    
+    // [BARU] Ambil secret key khusus bypass Cloudflare dari Environment Variable
+    const cfBypassSecret = process.env.CF_VERCEL_SECRET; 
 
     if (!apiKey) {
       return NextResponse.json(
@@ -55,19 +56,30 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': apiKey,
+        // [BARU] Header rahasia untuk "mengedipkan mata" ke Cloudflare WAF
+        'x-cf-secret': cfBypassSecret || '', 
       },
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
+      // ... (Error handling tetap sama) ...
       let errorMessage = 'Failed to compute route';
       try {
         const text = await response.text();
+        // Cek apakah errornya dari Cloudflare (biasanya HTML)
+        if (text.includes('Just a moment') || text.includes('challenge')) {
+             console.error('Kena Cloudflare Challenge!');
+             return NextResponse.json(
+                { error: 'Backend is blocked by Cloudflare. Check WAF Rules.' },
+                { status: 403 }
+             );
+        }
+        // ... sisa error handling lama ...
         try {
           const error = JSON.parse(text);
           errorMessage = error.detail || errorMessage;
         } catch {
-          // If response is not JSON, use the text content
           errorMessage = text || errorMessage;
         }
       } catch (e) {
