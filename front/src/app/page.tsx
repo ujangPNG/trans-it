@@ -229,8 +229,7 @@ export default function Home() {
           <div className="bg-[#1a1a1a] text-white p-4">
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-lg font-semibold flex items-center gap-2">
-                <span>🚌</span>
-                <span>TransJakarta</span>
+                <span>TransIt</span>
               </h1>
               <button
                 onClick={toggleSidebar}
