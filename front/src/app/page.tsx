@@ -193,7 +193,7 @@ export default function Home() {
       {/* Top Search Bar - "Mau ke mana?" */}
       <div
         ref={searchBarRef}
-        className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1001] w-full max-w-md px-4"
+        className="absolute top-4 left-1/2 transform -translate-x-1/2 z-1001 w-full max-w-md px-4"
       >
         <button
           onClick={handleSearchBarClick}
@@ -221,7 +221,7 @@ export default function Home() {
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className="absolute left-0 top-0 h-full w-[400px] bg-white shadow-xl z-[1000] overflow-y-auto"
+        className="absolute left-0 top-0 h-full w-[400px] bg-white shadow-xl z-1000 overflow-y-auto"
         style={{ transform: 'translateX(-400px)' }}
       >
         <div className="flex flex-col h-full">
@@ -367,12 +367,12 @@ export default function Home() {
                       className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0">
                           <div className="w-7 h-7 bg-[#1a1a1a] text-[#FFC107] rounded-full flex items-center justify-center font-bold text-xs shadow-sm">
                             {index + 1}
                           </div>
                         </div>
-                        <div className="flex-grow">
+                        <div className="grow">
                           <p className="font-semibold text-gray-900 text-sm mb-1">
                             {step.fromStopName || step.fromStopId}
                           </p>
