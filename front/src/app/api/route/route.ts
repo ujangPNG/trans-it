@@ -62,13 +62,18 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       let errorMessage = 'Failed to compute route';
       try {
-        const error = await response.json();
-        errorMessage = error.detail || errorMessage;
-      } catch {
-        // If response is not JSON, try to get text
         const text = await response.text();
-        errorMessage = text || errorMessage;
+        try {
+          const error = JSON.parse(text);
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // If response is not JSON, use the text content
+          errorMessage = text || errorMessage;
+        }
+      } catch (e) {
+        console.error('Error reading error response:', e);
       }
+      
       return NextResponse.json(
         { error: errorMessage },
         { status: response.status }

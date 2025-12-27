@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -522,6 +523,27 @@ def _build_optional_coordinate(
         raise HTTPException(status_code=400, detail=str(err)) from err
 
 
+def _clean_route_id(value: object) -> Optional[str]:
+    """Sanitize route_id value, handling NaN/None/empty strings."""
+    if value is None:
+        return None
+    try:
+        # Check for NaN if it's a float
+        if isinstance(value, float) and math.isnan(value):
+            return None
+        
+        # Convert to string
+        val_str = str(value).strip()
+        
+        # Check for empty or "nan"/"none" strings
+        if not val_str or val_str.lower() in ('nan', 'none'):
+            return None
+            
+        return val_str
+    except Exception:
+        return None
+
+
 def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEngine) -> StepResponse:
     """Konversi PathStep internal ke StepResponse yang API-friendly.
     
@@ -544,17 +566,7 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEng
     to_coordinates = _coords_from_attrs(to_attrs)
 
     # Ekstrak route_id dari attributes edge, handle nilai NaN/None
-    route_id = step.attributes.get("route_id") or step.attributes.get("name")
-    if route_id is not None:
-        try:
-            # Konversi ke string dan validasi
-            route_id_str = str(route_id)
-            if route_id_str.lower() in ('nan', 'none', ''):
-                route_id = None
-            else:
-                route_id = route_id_str
-        except Exception:
-            route_id = None
+    route_id = _clean_route_id(step.attributes.get("route_id") or step.attributes.get("name"))
 
     # Tentukan apakah ini transfer atau travel
     is_transfer = step.edge_type != "travel"
@@ -581,6 +593,10 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEng
         if not available_routes:
             available_routes = _graph_routes(graph, step.from_stop_id)
 
+        # Filter out invalid route IDs from lists
+        available_routes = [r for r in available_routes if _clean_route_id(r) is not None]
+        recommended_routes = [r for r in recommended_routes if _clean_route_id(r) is not None]
+
         # Fallback route_id: gunakan recommended pertama, atau available pertama
         if route_id is None and recommended_routes:
             route_id = recommended_routes[0]
@@ -597,6 +613,10 @@ def _step_to_response(step: PathStep, graph: nx.MultiDiGraph, engine: RoutingEng
             recommended_routes = _graph_routes(graph, step.to_stop_id)
         if not available_routes:
             available_routes = recommended_routes
+
+        # Filter out invalid route IDs from lists
+        available_routes = [r for r in available_routes if _clean_route_id(r) is not None]
+        recommended_routes = [r for r in recommended_routes if _clean_route_id(r) is not None]
 
     return StepResponse(
         from_stop_id=step.from_stop_id,
