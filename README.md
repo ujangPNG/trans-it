@@ -11,6 +11,8 @@ Aplikasi rute TransJakarta termurah (Fare-Aware Routing).
 
 **⚠️ Note:** Backend disarankan menggunakan **Linux** atau **WSL**.
 
+env.example udah di desain utk bisa langsung pake, jadi bisa langsung rename aja, atau tinggal copas semua command di bawah ini
+
 ### 1. Backend (Port 25200)
 
 ```bash
@@ -23,7 +25,7 @@ sh run.sh
 ```
 
 ### 2. Frontend (Port 3000)
-```
+```bash
 cd front
 npm install
 cp .env.example .env.local
